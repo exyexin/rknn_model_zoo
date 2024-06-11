@@ -161,3 +161,23 @@ RKNN Model Zoo 的例程基于当前最新的 RKNPU SDK 进行验证。若使用
 
 [Apache License 2.0](./LICENSE)
 
+## 流程
+  ### 1. 数据集准备
+  - 修改'examples/yolov7/cpp/postprocess.h'类别数和 `yolov7_map.py`头部的类别信息
+  - 复制val图片至 `datasets/<your datasets>/val`
+  - 在`datasets/<your datasets>/<val_list.txt>`创建记录有所有图片路径的txt文件(相对路径)
+  - 复制labels至`datasets/<your datasets>/labels`下，方便后续一起将gt信息复制到mAP仓库中进行下一步处理
+  - 修改头部配置信息
+  
+  ### 2. 运行参数
+ ```shell
+    # 运行rknn模型
+    python yolov7_map.py --model_path <model path> --target 3588 [--img_folder <path>] [--anchors <path>]
+    # 运行onnx模型
+    python yolov7_map.py --model_path <model path>  [--img_folder <path>] [--anchors <path>]
+ ```
+ 检测框标签保存至 `datasets/<your datasets>/mAP_label`<br>
+ ~当心硬编码，注意修改~
+ 
+ ### 3. convert.py
+@todo

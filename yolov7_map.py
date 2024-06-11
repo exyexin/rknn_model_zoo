@@ -10,6 +10,7 @@ realpath = realpath.split(_sep)
 sys.path.append(os.path.join(realpath[0] + _sep, *realpath[1:realpath.index('rknn_model_zoo') + 1]))
 
 from py_utils.coco_utils import COCO_test_helper
+from py_utils.mAP import ap_per_class, record_map
 import numpy as np
 
 OBJ_THRESH = 0.25
@@ -26,6 +27,7 @@ CLASSES = ('UAV',)
 coco_id_list = [1]
 
 LABEL_SAVE_PATH = './datasets/Anti-UAV-jiafang/mAP_label'
+ANNO_PATH = './datasets/Anti-UAV-jiafang/labels'
 
 
 def save_labels(boxes, classes, scores, path, labelname):
@@ -33,7 +35,7 @@ def save_labels(boxes, classes, scores, path, labelname):
 	s = zip(classes, scores, boxes)
 	with open(os.path.join(path, labelname), 'w+') as f:
 		for line in s:
-			f.write(f'{CLASSES[line[0]]} {line[1]} {str(line[2])[1:-2]}')
+			f.write(f'{CLASSES[line[0]]} {line[1]} {str(line[2])[1:-1]}\n')
 
 
 def filter_boxes(boxes, box_confidences, box_class_probs):
@@ -213,7 +215,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Process some integers.')
 	# basic params
 	parser.add_argument('--model_path', type=str, required=True, help='model path, could be .pt or .rknn file')
-	parser.add_argument('--target', type=str, default='rk3566', help='target RKNPU platform')
+	parser.add_argument('--target', type=str, default='rk3588', help='target RKNPU platform')
 	parser.add_argument('--device_id', type=str, default=None, help='device id')
 
 	parser.add_argument('--img_show', action='store_true', default=False, help='draw the result and show')
@@ -247,6 +249,9 @@ if __name__ == '__main__':
 	co_helper = COCO_test_helper(enable_letter_box=True)
 
 	# run test
+	pred_boxes = []
+	pred_classes = []
+	pred_scores = []
 	for i in range(len(img_list)):
 		print('infer {}/{}'.format(i + 1, len(img_list)), end='\r')
 
@@ -259,12 +264,6 @@ if __name__ == '__main__':
 		img_src = cv2.imread(img_path)
 		if img_src is None:
 			continue
-
-		'''
-		# using for test input dumped by C.demo
-		img_src = np.fromfile('./input_b/demo_c_input_hwc_rgb.txt', dtype=np.uint8).reshape(640,640,3)
-		img_src = cv2.cvtColor(img_src, cv2.COLOR_RGB2BGR)
-		'''
 
 		# Due to rga init with (0,0,0), we using pad_color (0,0,0) instead of (114, 114, 114)
 		pad_color = (0, 0, 0)
@@ -281,8 +280,13 @@ if __name__ == '__main__':
 
 		outputs = model.run([input_data])
 		boxes, classes, scores = post_process(outputs, anchors)
+		pred_boxes.append(boxes)
+		pred_classes.append(classes)
+		pred_scores.append(scores)
 
-		save_labels(boxes, classes, scores, LABEL_SAVE_PATH, img_name.replace('jpg', 'txt'))
+		# cal mAP
+		save_labels(co_helper.get_real_box(boxes).astype(int), classes, scores, LABEL_SAVE_PATH, img_name.replace('jpg', 'txt'))
+		# record_map(boxes, classes, scores, ANNO_PATH, img_src.shape[:-1], co_helper=co_helper)
 
 		if args.img_show or args.img_save:
 			print('\n\nIMG: {}'.format(img_name))
@@ -314,15 +318,4 @@ if __name__ == '__main__':
 												score=round(scores[i], 5).astype(np.float)
 												)
 
-	##数据集不匹配
-	if False:
-		# calculate maps
-		if args.coco_map_test is True:
-			pred_json = args.model_path.split('.')[-2] + '_{}'.format(platform) + '.json'
-			pred_json = pred_json.split('/')[-1]
-			pred_json = os.path.join('./', pred_json)
-			co_helper.export_to_json(pred_json)
-
-			from py_utils.coco_utils import coco_eval_with_json
-
-			coco_eval_with_json(args.anno_json, pred_json)
+	record_map(pred_boxes, pred_classes, pred_scores, ANNO_PATH, img_src.shape[:-1], co_helper=co_helper)
