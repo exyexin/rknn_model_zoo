@@ -10,7 +10,7 @@ realpath = realpath.split(_sep)
 sys.path.append(os.path.join(realpath[0] + _sep, *realpath[1:realpath.index('rknn_model_zoo') + 1]))
 
 from py_utils.coco_utils import COCO_test_helper
-from py_utils.mAP import ap_per_class, record_map
+# from py_utils.mAP import ap_per_class, record_map
 import numpy as np
 
 OBJ_THRESH = 0.25
@@ -222,9 +222,6 @@ if __name__ == '__main__':
 	parser.add_argument('--img_save', action='store_true', default=False, help='save the result')
 
 	# data params
-	parser.add_argument('--anno_json', type=str,
-						default='../../../datasets/Anti-UAV-jiafang/annotations/annotations_MSCOCO.json',
-						help='coco annotation path')
 	# coco val folder: '../../../datasets/COCO//val2017'
 	parser.add_argument('--img_folder', type=str, default='./datasets/Anti-UAV-jiafang/val', help='img folder path')
 	parser.add_argument('--coco_map_test', action='store_true', help='enable coco map test')
@@ -318,4 +315,4 @@ if __name__ == '__main__':
 												score=round(scores[i], 5).astype(np.float)
 												)
 
-	record_map(pred_boxes, pred_classes, pred_scores, ANNO_PATH, img_src.shape[:-1], co_helper=co_helper)
+

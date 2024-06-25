@@ -1,5 +1,5 @@
 import os
-
+import cv2
 import numpy as np
 
 
@@ -24,8 +24,14 @@ def txt_check(path):
 # 	y2 = round(y_center + h / 2)
 # return None
 
+def error(msg):
+	print(msg)
+
+
+# sys.exit(0)
 
 def get_true_anno(dir_path, img_size, co_helper):
+	return None
 	file_list = [os.path.join(dir_path, it) for it in sorted(os.listdir(dir_path))]
 	label_list = []
 	height, width = img_size
@@ -154,8 +160,41 @@ def compute_ap(recall, precision, v5_metric=False):
 	return ap, mpre, mrec
 
 
-def record_map(pred_boxes, pred_classes, pred_scores, gt_path, img_size, co_helper):
-	'''目前还不可用'''
-	return None
-	target_cls, tp = get_true_anno(gt_path, img_size, co_helper=co_helper)
+def get_anno_img_path(gt_path, img_path, img_type='jpg'):
+	gt_list = []
+	img_list = []
+	gt_lsdir = sorted(os.listdir(gt_path))
+	# check file is txt
+	for i in gt_lsdir:
+		print(os.path.splitext(i)[-1])
+		if os.path.splitext(i)[-1] == '.txt':
+			gt_list.append(os.path.join(gt_path, i))
+
+	for i in gt_list:
+		# 获取图片名
+		name = os.path.basename(i).replace('txt', img_type)
+		# 获取图片路径+文件名
+		name = os.path.join(img_path, name)
+		if os.path.exists(name):
+			img_list.append(name)
+
+	return gt_list, img_list
+
+
+def get_true_info(gt_list, img_list):
+	# todo
+	for i in gt_list:
+		with open(i, 'r') as f:
+			pass
+
+
+def record_map(pred_boxes, pred_classes, pred_scores, gt_path, img_path, co_helper):
+	# Todo 需要完成获取tp值的代码
+	[gt_list, img_list] = get_anno_img_path(gt_path, img_path, 'jpg')
+
+	target_cls, tp = get_true_anno(gt_path, img_path, co_helper=co_helper)
 	output = ap_per_class(tp, pred_scores, pred_classes, target_cls)
+
+
+if __name__ == '__main__':
+	get_anno_img_path('../datasets/Anti-UAV-jiafang/labels', '../datasets/Anti-UAV-jiafang/val', 'jpg')

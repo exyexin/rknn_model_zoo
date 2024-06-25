@@ -1,7 +1,7 @@
 import sys
 from rknn.api import RKNN
 
-DATASET_PATH = '../../../datasets/COCO/coco_subset_20.txt'
+DATASET_PATH = '../../../datasets/Anti-UAV-jiafang/Anti-UAV-jifang_val.txt'
 DEFAULT_RKNN_PATH = '../model/yolov7.rknn'
 DEFAULT_QUANT = True
 
