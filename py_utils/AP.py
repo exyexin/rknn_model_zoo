@@ -587,7 +587,7 @@ def get_AP(MINOVERLAP):
 
 
 def get_AP_95():
-	map95 = [get_AP(i) for i in np.linspace(0.5, 0.95, 11)]
+	map95 = [get_AP(i) for i in np.linspace(0.5, 0.95, 10)]
 	print(map95)
 	print(np.mean(map95))
 
