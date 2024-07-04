@@ -273,10 +273,10 @@ if __name__ == '__main__':
 	co_helper = COCO_test_helper(enable_letter_box=True)
 
 	# param for ap_per_class
-	tp = []
-	conf = []
-	pred_cls = []
-	target_cls = []
+	tp = np.empty((0, 10))
+	conf = np.empty(0)
+	pred_cls = np.empty(0)
+	target_cls = np.empty(0)
 
 	# run test
 	pred_boxes = []
@@ -320,26 +320,25 @@ if __name__ == '__main__':
 
 		# calculate tp
 		tp_once = []
-		cls, gt = process_label(args.label_folder, img_name.split('.')[-2] + '.txt', img_src)
+		true_cls, gt = process_label(args.label_folder, img_name.split('.')[-2] + '.txt', img_src)
 		# todo
 		# 需要考虑未检测到目标的情况
 		if boxes is not None:
 			# boxex = co_helper.get_real_box(boxes)
 			iou = cal_iou(gt, co_helper.get_real_box(boxes).astype(int))
+			# todo
 			for item in iou:
 				for i in np.linspace(0.5, 0.95, 10):
 					tp_once.append(True if iou > i else False)
+			tp = np.append(tp, [tp_once], axis=0)
+			conf = np.append(conf, pred_scores)
+			pred_cls = np.append(pred_cls, pred_classes)
+			target_cls = np.append(target_cls, true_cls)
 		else:
-			for i in range(len(gt)):
-				tp_once.append([False] * 10)
+			# for i in range(len(gt)):
+			# 	tp_once.append([False] * 10)
+			pass
 
-		tp.append(tp_once)
-		conf.append(pred_scores)
-		pred_cls.append(pred_classes)
-		target_cls.append(cls)
-
-	conf = np.array(conf).flatten().tolist()
-	pred_cls = np.array(pred_cls).flatten().tolist()
-	target_cls = np.array(target_cls).flatten().tolist()
-	ap = ap_per_class(tp, conf, pred_cls, target_cls)
-	print(ap)
+	p, r, ap, f1, ap_class = ap_per_class(tp, conf, pred_cls, target_cls)
+	ap50, ap = ap[:, 0], ap.mean(1)
+	print(f'ap50:{ap50},\nap{ap}\n')
