@@ -8,6 +8,7 @@
 *.npy
 *.pkl
 *.pb
+datasets/Anti-UAV-jiafang
 
 check*.onnx
 
