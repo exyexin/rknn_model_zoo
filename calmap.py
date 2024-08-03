@@ -3,6 +3,10 @@ import cv2
 import sys
 import argparse
 import numpy as np
+import torch
+from ultralytics.utils.metrics import box_iou
+from py_utils.mAP import ap_per_class
+from ultralytics.utils.ops import scale_coords,xywh2xyxy,xywhn2xyxy
 
 # from py_utils.xywh2xyxy import xywh2xyxy
 
@@ -12,9 +16,9 @@ _sep = os.path.sep
 realpath = realpath.split(_sep)
 sys.path.append(os.path.join(realpath[0] + _sep, *realpath[1:realpath.index('rknn_model_zoo') + 1]))
 from py_utils.coco_utils import COCO_test_helper
-from py_utils.get_gt import get_gt
-from py_utils.cal_iou import cal_iou
-from py_utils.mAP import ap_per_class
+# from py_utils.get_gt import get_gt
+# from py_utils.cal_iou import cal_iou
+# from py_utils.mAP import ap_per_class
 
 OBJ_THRESH = 0.25
 NMS_THRESH = 0.45
@@ -24,6 +28,9 @@ NMS_THRESH = 0.45
 # NMS_THRESH = 0.65
 
 IMG_SIZE = (640, 640)  # (width, height), such as (1280, 736)
+
+#tmp
+names = {0:'UAV',1:'None'}
 
 CLASSES = ("person", "bicycle", "car", "motorbike ", "aeroplane ", "bus ", "train", "truck ", "boat", "traffic light",
 		   "fire hydrant", "stop sign ", "parking meter", "bench", "bird", "cat", "dog ", "horse ", "sheep", "cow",
@@ -233,8 +240,16 @@ def img_check(path):
 def process_label(label_path, label_name, img=None):
 	# get label file
 	label_file = os.path.join(label_path, label_name)
-	cls, gt = get_gt(label_file, float, convert=True, img=img)
-	return cls, gt
+	# cls, gt = get_gt(label_file, float, convert=True, img=img)
+	lines=[]
+	with open(label_file) as f:
+		for line in f:
+			data = list(map(float,line.strip().split()))
+			lines.append(data)
+	# for line in lines:
+	# res = lines.strip().split()
+	res = torch.tensor(lines)
+	return res
 
 
 if __name__ == '__main__':
@@ -279,9 +294,7 @@ if __name__ == '__main__':
 	target_cls = np.empty(0)
 
 	# run test
-	pred_boxes = []
-	pred_classes = []
-	pred_scores = []
+	stats=[]
 	for i in range(len(img_list)):
 		print('infer {}/{}'.format(i + 1, len(img_list)), end='\r')
 
@@ -310,35 +323,75 @@ if __name__ == '__main__':
 
 		outputs = model.run([input_data])
 		boxes, classes, scores = post_process(outputs, anchors)
-		pred_boxes.append(boxes)
-		pred_classes.append(classes)
-		pred_scores.append(scores)
+		
+		pred = torch.cat((torch.from_numpy(boxes),torch.from_numpy(scores.reshape(-1,1)),torch.from_numpy(classes.reshape(-1,1))),dim=1)
+		predn = pred.clone()
+		scale_coords(img.shape[:2],predn[:,:2],img_src.shape[:2],None)
+		scale_coords(img.shape[:2],predn[:,2:4],img_src.shape[:2],None)
 
 		# cal mAP
+		device = 'cpu'
+		iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+		niou = iouv.numel()
+		label_per_img = process_label(args.label_folder, img_name.replace('jpg','txt'), img_src)
+		nl = len(label_per_img)
+		#假定返回格式为numpy/torch
+		tcls = label_per_img[:,0].tolist() if nl else []
+
+		correct = torch.zeros(boxes.shape[0],niou,dtype=torch.bool,device=device)
+		if nl:
+			detected = []
+			tcls_tensor = label_per_img[:,0]
+			#是否进行xywh2xyxy?
+			#todo 需要将anno转化为图像中实际坐标
+			tbox = label_per_img[:,1:5]
+			tbox=xywhn2xyxy(tbox,w=img_src.shape[1],h=img_src.shape[0])
+			# scale_coords(img.shape[:2],tbox[:,:2],img_src.shape[:2],None)
+			# scale_coords(img.shape[:2],tbox[:,2:4],img_src.shape[:2],None)
+			for cls in torch.unique(tcls_tensor):
+				ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # target indices
+				pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # prediction indices
+				if pi.shape[0]:
+					ious,i=box_iou(predn[pi,:4],tbox[ti]).max(1)
+
+				# Append detections
+					detected_set = set()
+					for j in (ious > iouv[0]).nonzero(as_tuple=False):
+						d = ti[i[j]]  # detected target
+						if d.item() not in detected_set:
+							detected_set.add(d.item())
+							detected.append(d)
+							correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+							if len(detected) == nl:  # all targets already located in image
+								break
+		stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+
+	stats = [np.concatenate(x, 0) for x in zip(*stats)]
 		# save_labels(co_helper.get_real_box(boxes).astype(int), classes, scores, LABEL_SAVE_PATH, img_name.replace('jpg', 'txt'))
 		# record_map(boxes, classes, scores, ANNO_PATH, img_src.shape[:-1], co_helper=co_helper)
 
 		# calculate tp
-		tp_once = []
-		true_cls, gt = process_label(args.label_folder, img_name.split('.')[-2] + '.txt', img_src)
-		# todo
-		# 需要考虑未检测到目标的情况
-		if boxes is not None:
-			# boxex = co_helper.get_real_box(boxes)
-			iou = cal_iou(gt, co_helper.get_real_box(boxes).astype(int))
-			# todo
-			for item in iou:
-				for i in np.linspace(0.5, 0.95, 10):
-					tp_once.append(True if iou > i else False)
-			tp = np.append(tp, [tp_once], axis=0)
-			conf = np.append(conf, pred_scores)
-			pred_cls = np.append(pred_cls, pred_classes)
-			target_cls = np.append(target_cls, true_cls)
-		else:
-			# for i in range(len(gt)):
-			# 	tp_once.append([False] * 10)
-			pass
+		# tp_once = []
+		# true_cls, gt = process_label(args.label_folder, img_name.split('.')[-2] + '.txt', img_src)
+		# # todo
+		# # 需要考虑未检测到目标的情况
+		# if boxes is not None:
+		# 	# boxex = co_helper.get_real_box(boxes)
+		# 	iou = cal_iou(gt, co_helper.get_real_box(boxes).astype(int))
+		# 	# todo
+		# 	for item in iou:
+		# 		for i in np.linspace(0.5, 0.95, 10):
+		# 			tp_once.append(True if iou > i else False)
+		# 	tp = np.append(tp, [tp_once], axis=0)
+		# 	conf = np.append(conf, pred_scores)
+		# 	pred_cls = np.append(pred_cls, pred_classes)
+		# 	target_cls = np.append(target_cls, true_cls)
+		# else:
+		# 	# for i in range(len(gt)):
+		# 	# 	tp_once.append([False] * 10)
+		# 	pass
 
-	p, r, ap, f1, ap_class = ap_per_class(tp, conf, pred_cls, target_cls)
+	# p, r, ap, f1, ap_class = ap_per_class(tp, conf, pred_cls, target_cls)
+	p, r, ap, f1, ap_class = ap_per_class(*stats,names=names)
 	ap50, ap = ap[:, 0], ap.mean(1)
 	print(f'ap50:{ap50},\nap{ap}\n')
