@@ -8,17 +8,12 @@ from ultralytics.utils.metrics import box_iou
 from py_utils.mAP import ap_per_class
 from ultralytics.utils.ops import scale_coords,xywh2xyxy,xywhn2xyxy
 
-# from py_utils.xywh2xyxy import xywh2xyxy
-
 # add path
 realpath = os.path.abspath(__file__)
 _sep = os.path.sep
 realpath = realpath.split(_sep)
 sys.path.append(os.path.join(realpath[0] + _sep, *realpath[1:realpath.index('rknn_model_zoo') + 1]))
 from py_utils.coco_utils import COCO_test_helper
-# from py_utils.get_gt import get_gt
-# from py_utils.cal_iou import cal_iou
-# from py_utils.mAP import ap_per_class
 
 OBJ_THRESH = 0.25
 NMS_THRESH = 0.45
@@ -30,7 +25,7 @@ NMS_THRESH = 0.45
 IMG_SIZE = (640, 640)  # (width, height), such as (1280, 736)
 
 #tmp
-names = {0:'UAV',1:'None'}
+names = {0:'UAV'}
 
 CLASSES = ("person", "bicycle", "car", "motorbike ", "aeroplane ", "bus ", "train", "truck ", "boat", "traffic light",
 		   "fire hydrant", "stop sign ", "parking meter", "bench", "bird", "cat", "dog ", "horse ", "sheep", "cow",
@@ -46,22 +41,16 @@ CLASSES = ("person", "bicycle", "car", "motorbike ", "aeroplane ", "bus ", "trai
 		   "oven ", "toaster", "sink", "refrigerator ", "book", "clock", "vase", "scissors ", "teddy bear ",
 		   "hair drier", "toothbrush ")
 
-coco_id_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32,
-				33, 34,
-				35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
-				62, 63,
-				64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
-
 # LABEL_SAVE_PATH = './datasets/Anti-UAV-jiafang/mAP_label'
 ANNO_PATH = './datasets/Anti-UAV-jiafang/labels'
 
 
-def save_labels(boxes, classes, scores, path, labelname):
-	# boxes = np.array2string(boxes, separator=',')
-	s = zip(classes, scores, boxes)
-	with open(os.path.join(path, labelname), 'w+') as f:
-		for line in s:
-			f.write(f'{CLASSES[line[0]]} {line[1]} {str(line[2])[1:-1]}\n')
+# def save_labels(boxes, classes, scores, path, labelname):
+# 	# boxes = np.array2string(boxes, separator=',')
+# 	s = zip(classes, scores, boxes)
+# 	with open(os.path.join(path, labelname), 'w+') as f:
+# 		for line in s:
+# 			f.write(f'{CLASSES[line[0]]} {line[1]} {str(line[2])[1:-1]}\n')
 
 
 def filter_boxes(boxes, box_confidences, box_class_probs):
@@ -240,14 +229,11 @@ def img_check(path):
 def process_label(label_path, label_name, img=None):
 	# get label file
 	label_file = os.path.join(label_path, label_name)
-	# cls, gt = get_gt(label_file, float, convert=True, img=img)
 	lines=[]
 	with open(label_file) as f:
 		for line in f:
 			data = list(map(float,line.strip().split()))
 			lines.append(data)
-	# for line in lines:
-	# res = lines.strip().split()
 	res = torch.tensor(lines)
 	return res
 
@@ -343,11 +329,9 @@ if __name__ == '__main__':
 			detected = []
 			tcls_tensor = label_per_img[:,0]
 			#是否进行xywh2xyxy?
-			#todo 需要将anno转化为图像中实际坐标
+			#需要将anno转化为图像中实际坐标
 			tbox = label_per_img[:,1:5]
 			tbox=xywhn2xyxy(tbox,w=img_src.shape[1],h=img_src.shape[0])
-			# scale_coords(img.shape[:2],tbox[:,:2],img_src.shape[:2],None)
-			# scale_coords(img.shape[:2],tbox[:,2:4],img_src.shape[:2],None)
 			for cls in torch.unique(tcls_tensor):
 				ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # target indices
 				pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # prediction indices
@@ -367,30 +351,6 @@ if __name__ == '__main__':
 		stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
 
 	stats = [np.concatenate(x, 0) for x in zip(*stats)]
-		# save_labels(co_helper.get_real_box(boxes).astype(int), classes, scores, LABEL_SAVE_PATH, img_name.replace('jpg', 'txt'))
-		# record_map(boxes, classes, scores, ANNO_PATH, img_src.shape[:-1], co_helper=co_helper)
-
-		# calculate tp
-		# tp_once = []
-		# true_cls, gt = process_label(args.label_folder, img_name.split('.')[-2] + '.txt', img_src)
-		# # todo
-		# # 需要考虑未检测到目标的情况
-		# if boxes is not None:
-		# 	# boxex = co_helper.get_real_box(boxes)
-		# 	iou = cal_iou(gt, co_helper.get_real_box(boxes).astype(int))
-		# 	# todo
-		# 	for item in iou:
-		# 		for i in np.linspace(0.5, 0.95, 10):
-		# 			tp_once.append(True if iou > i else False)
-		# 	tp = np.append(tp, [tp_once], axis=0)
-		# 	conf = np.append(conf, pred_scores)
-		# 	pred_cls = np.append(pred_cls, pred_classes)
-		# 	target_cls = np.append(target_cls, true_cls)
-		# else:
-		# 	# for i in range(len(gt)):
-		# 	# 	tp_once.append([False] * 10)
-		# 	pass
-
 	# p, r, ap, f1, ap_class = ap_per_class(tp, conf, pred_cls, target_cls)
 	p, r, ap, f1, ap_class = ap_per_class(*stats,names=names)
 	ap50, ap = ap[:, 0], ap.mean(1)

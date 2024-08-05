@@ -161,7 +161,7 @@ RKNN Model Zoo 的例程基于当前最新的 RKNPU SDK 进行验证。若使用
 
 [Apache License 2.0](./LICENSE)
 
-## 流程
+<!-- ## 流程
   ### 1. 数据集准备
   - 修改'examples/yolov7/cpp/postprocess.h'类别数和 `yolov7_map.py`头部的类别信息
   - 复制val图片至 `datasets/<your datasets>/val`
@@ -180,4 +180,4 @@ RKNN Model Zoo 的例程基于当前最新的 RKNPU SDK 进行验证。若使用
  ~当心硬编码，注意修改~
  
  ### 3. convert.py
-@todo
+@todo -->
