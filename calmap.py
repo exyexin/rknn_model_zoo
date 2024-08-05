@@ -350,8 +350,24 @@ if __name__ == '__main__':
 								break
 		stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
 
+	# Compute statistics
 	stats = [np.concatenate(x, 0) for x in zip(*stats)]
 	# p, r, ap, f1, ap_class = ap_per_class(tp, conf, pred_cls, target_cls)
-	p, r, ap, f1, ap_class = ap_per_class(*stats,names=names)
-	ap50, ap = ap[:, 0], ap.mean(1)
-	print(f'ap50:{ap50},\nap{ap}\n')
+	if len(stats) and stats[0].any():
+		p, r, ap, f1, ap_class = ap_per_class(*stats,names=names)
+		ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+		mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+		# nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
+	else:
+		# nt = torch.zeros(1)
+		print("None, please checkout!")
+
+	# Print results
+	pf = '%20s' + '%12i' * 2 + '%12.3g' * 4  # print format
+	# print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+	print(pf % ('all', mp, mr, map50, map))
+
+	# Print results per class
+	# if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
+	# 	for i, c in enumerate(ap_class):
+	# 		print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
