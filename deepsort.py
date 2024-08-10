@@ -6,7 +6,8 @@ from ultralytics.utils.plotting import ImageDraw
 import cv2
 import numpy as np
 
-from rknn.api import RKNN
+from rknnlite.api import RKNNLite as RKNN
+# from rknnlite.api import RKNN
 
 OBJ_THRESH = 0.25
 NMS_THRESH = 0.45
@@ -21,8 +22,8 @@ CLASSES = ("UAV")
 
 def get_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--model_path', type=str, required=True, help='model path, could be .pt or .rknn file')
-	parser.add_argument('--target', type=str, default='rk3588', help='target RKNPU platform')
+	parser.add_argument('--model_path', type=str, default='./models/rknn-onnx/Anti-UAV-jiafang4-fp.rknn', help='model path, could be .pt or .rknn file')
+	parser.add_argument('--target', type=str, default='onboard', help='target RKNPU platform')
 	parser.add_argument('--device_id', type=str, default=None, help='device id')
 
 	# parser.add_argument('--img_show', action='store_true', default=False, help='draw the result and show')
@@ -31,7 +32,7 @@ def get_args():
 	parser.add_argument('--video_show', action='store_true', default=False, help='show the result')
 
 	# data params
-	parser.add_argument('--video', type=str, required=True, help='video path')
+	parser.add_argument('--video', type=str, default='./visible.mp4', help='video path')
 	parser.add_argument('--anchors', type=str, default='./RK_anchors.txt',
 						help='target to anchor file, only yolov5, yolov7 need this param')
 	
@@ -47,6 +48,8 @@ class RKNN_model_container():
 		print('--> Init runtime environment')
 		if target==None:
 			ret = rknn.init_runtime()
+		elif target=='onboard':
+			ret = rknn.init_runtime(core_mask=RKNN.NPU_CORE_0)
 		else:
 			ret = rknn.init_runtime(target=target, device_id=device_id)
 		if ret != 0:
@@ -92,7 +95,7 @@ def setup_model(args):
 		model = Torch_model_container(args.model_path)
 	elif model_path.endswith('.rknn'):
 		platform = 'rknn'
-		from py_utils.rknn_executor import RKNN_model_container
+		# from py_utils.rknn_executor import RKNN_model_container
 		model = RKNN_model_container(args.model_path, args.target, args.device_id)
 	elif model_path.endswith('onnx'):
 		platform = 'onnx'
@@ -258,17 +261,18 @@ if __name__ == '__main__':
 	video = Video(args.video)
 	for img_src, img1 in video:
 		# preprocee if not rknn model
-
 		if platform in ['pytorch', 'onnx']:
 			input_data = img1.transpose((2, 0, 1))
 			input_data = input_data.reshape(1, *input_data.shape).astype(np.float32)
 			input_data = input_data / 255.
 		else:
-			input_data = img1
+			input_data = np.expand_dims(img1,axis=0)
 
 		# print(input_data.shape)
 		outputs =model.run([input_data])
+
 		boxes, classes, scores = post_process(outputs, anchors)
+		print(type(boxes),len(boxes))
 		pred = torch.cat((torch.from_numpy(boxes),torch.from_numpy(scores.reshape(-1,1)),torch.from_numpy(classes.reshape(-1,1))),dim=1)
 		# 处理预测后的标签 -> ltbr(img_src)
 		predn = pred.clone()
@@ -278,6 +282,6 @@ if __name__ == '__main__':
 		img_draw = img_src.copy()
 		draw(img_draw,predn[:,:4],predn[:,4],classes)
 		print("draw Done!")
-		cv2.imshow("video",img_draw)
+		cv2.imshow("video.jpg",img_draw)
 		cv2.waitKey(1)
 		
