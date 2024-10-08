@@ -24,8 +24,9 @@ NMS_THRESH = 0.45
 
 IMG_SIZE = (640, 640)  # (width, height), such as (1280, 736)
 
-#tmp
+
 names = {0:'UAV'}
+nc = 1
 
 CLASSES = ("person", "bicycle", "car", "motorbike ", "aeroplane ", "bus ", "train", "truck ", "boat", "traffic light",
 		   "fire hydrant", "stop sign ", "parking meter", "bench", "bird", "cat", "dog ", "horse ", "sheep", "cow",
@@ -363,11 +364,11 @@ if __name__ == '__main__':
 		print("None, please checkout!")
 
 	# Print results
-	pf = '%20s' + '%12i' * 2 + '%12.3g' * 4  # print format
-	# print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+	pf = '%20s' + '%12.3g' * 4  # print format
+	# print(f' mp:{mp}\n mr:{mr}\n map50:{map50}\n map:{map}\n')
 	print(pf % ('all', mp, mr, map50, map))
 
 	# Print results per class
 	# if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
-	# 	for i, c in enumerate(ap_class):
-	# 		print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
+	for i, c in enumerate(ap_class):
+		print(pf % (names[c], p[i], r[i], ap50[i], ap[i]))
