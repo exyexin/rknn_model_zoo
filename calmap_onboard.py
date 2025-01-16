@@ -60,6 +60,40 @@ ANNO_PATH = '/game2/data/yolo/datasets/MAR20/labels'
 # 			f.write(f'{CLASSES[line[0]]} {line[1]} {str(line[2])[1:-1]}\n')
 
 
+# from rknn.api import RKNN
+from rknnlite.api import RKNNLite as RKNN
+
+
+
+class RKNN_model_container():
+    def __init__(self, model_path, target=None, device_id=None) -> None:
+        rknn = RKNN()
+
+        # Direct Load RKNN Model
+        rknn.load_rknn(model_path)
+
+        print('--> Init runtime environment')
+        if target==None:
+            ret = rknn.init_runtime()
+        else:
+            ret = rknn.init_runtime(target=target, device_id=device_id)
+        if ret != 0:
+            print('Init runtime environment failed')
+            exit(ret)
+        print('done')
+        
+        self.rknn = rknn 
+
+    def run(self, inputs):
+        if isinstance(inputs, list) or isinstance(inputs, tuple):
+            pass
+        else:
+            inputs = [inputs]
+
+        result = self.rknn.inference(inputs=inputs)
+    
+        return result
+
 def filter_boxes(boxes, box_confidences, box_class_probs):
 	"""Filter boxes with object threshold.
 	"""
@@ -213,7 +247,7 @@ def setup_model(args):
 		model = Torch_model_container(args.model_path)
 	elif model_path.endswith('.rknn'):
 		platform = 'rknn'
-		from py_utils.rknn_executor import RKNN_model_container
+		# from py_utils.rknn_executor import RKNN_model_container
 		model = RKNN_model_container(args.model_path, args.target, args.device_id)
 	elif model_path.endswith('onnx'):
 		platform = 'onnx'
